@@ -1,0 +1,11 @@
+.idea
+.pyc
+__pycache__
+env
+.pytest_cache
+tests/i18n
+poetry.lock
+htmlcov
+.coverage
+.claude
+
