@@ -162,6 +162,7 @@ class FakeKC:
         return {}
 
     async def a_get_users(self, query=None):
+        self._last_users_query = dict(query or {})
         query = query or {}
         username = query.get("username")
         if username is None:
@@ -325,3 +326,4 @@ async def test_ensure_user_requires_exact_username():
 
     with pytest.raises(KeycloakAdminError):
         await admin.ensure_user("s.gallo")
+    assert fake._last_users_query.get("exact") == "true"
