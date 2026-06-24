@@ -171,7 +171,7 @@ class FakeKC:
         result = []
         for user in self._users.values():
             name = user["username"]
-            if (exact and name == username) or (not exact and username in name):
+            if (exact and name.lower() == username.lower()) or (not exact and username in name):
                 result.append(user)
         return result
 
@@ -327,3 +327,16 @@ async def test_ensure_user_requires_exact_username():
     with pytest.raises(KeycloakAdminError):
         await admin.ensure_user("s.gallo")
     assert fake._last_users_query.get("exact") == "true"
+
+
+async def test_ensure_user_matches_case_insensitively():
+    fake = FakeKC()
+    fake.add_user("s.gallo")  # Keycloak stores lowercase
+    admin = KeycloakAdmin(
+        "http://kc", "iam-test",
+        admin_user="admin", admin_password="admin", kc=fake,
+    )
+
+    user_id = await admin.ensure_user("S.Gallo")
+
+    assert user_id == "user-s.gallo"

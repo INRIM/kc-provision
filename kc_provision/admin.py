@@ -143,7 +143,7 @@ class KeycloakAdmin:
                 f"lookup user '{username}' fallito: {exc}"
             ) from exc
         for user in users or []:
-            if user.get("username") == username and user.get("id"):
+            if user.get("username", "").lower() == username.lower() and user.get("id"):
                 return user["id"]
         raise KeycloakAdminError(
             f"user '{username}' non materializzato dalla federation: "
