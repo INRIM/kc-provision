@@ -161,6 +161,20 @@ class FakeKC:
         ]
         return {}
 
+    async def a_get_users(self, query=None):
+        self._last_users_query = dict(query or {})
+        query = query or {}
+        username = query.get("username")
+        if username is None:
+            return list(self._users.values())
+        exact = str(query.get("exact", "false")).lower() == "true"
+        result = []
+        for user in self._users.values():
+            name = user["username"]
+            if (exact and name.lower() == username.lower()) or (not exact and username in name):
+                result.append(user)
+        return result
+
     async def a_get_user_id(self, username):
         user = self._users.get(username)
         return user["id"] if user else None
@@ -274,3 +288,55 @@ async def test_user_can_be_enabled_and_disabled_in_group():
 
     await admin.disable_user_in_group("mario", "operatori")
     assert (user["id"], group["id"]) not in fake._group_memberships
+
+
+async def test_ensure_user_returns_id_for_materialized_user():
+    fake = FakeKC()
+    fake.add_user("s.gallo")
+    admin = KeycloakAdmin(
+        "http://kc", "iam-test",
+        admin_user="admin", admin_password="admin", kc=fake,
+    )
+
+    user_id = await admin.ensure_user("s.gallo")
+
+    assert user_id == "user-s.gallo"
+
+
+async def test_ensure_user_raises_when_not_materialized():
+    fake = FakeKC()  # nessun utente
+    admin = KeycloakAdmin(
+        "http://kc", "iam-test",
+        admin_user="admin", admin_password="admin", kc=fake,
+    )
+
+    with pytest.raises(KeycloakAdminError) as exc:
+        await admin.ensure_user("nope")
+
+    assert "non materializzato" in str(exc.value)
+
+
+async def test_ensure_user_requires_exact_username():
+    fake = FakeKC()
+    fake.add_user("s.gallo.old")
+    admin = KeycloakAdmin(
+        "http://kc", "iam-test",
+        admin_user="admin", admin_password="admin", kc=fake,
+    )
+
+    with pytest.raises(KeycloakAdminError):
+        await admin.ensure_user("s.gallo")
+    assert fake._last_users_query.get("exact") == "true"
+
+
+async def test_ensure_user_matches_case_insensitively():
+    fake = FakeKC()
+    fake.add_user("s.gallo")  # Keycloak stores lowercase
+    admin = KeycloakAdmin(
+        "http://kc", "iam-test",
+        admin_user="admin", admin_password="admin", kc=fake,
+    )
+
+    user_id = await admin.ensure_user("S.Gallo")
+
+    assert user_id == "user-s.gallo"

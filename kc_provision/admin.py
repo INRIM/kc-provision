@@ -127,6 +127,30 @@ class KeycloakAdmin:
             raise KeycloakAdminError(f"user '{username}' non esiste")
         return user_id
 
+    async def ensure_user(self, username: str) -> str:
+        """Materializza un utente federato e ritorna il suo user id KC.
+
+        Con la federation LDAP e `Import users` attivo, il lookup admin per
+        username importa l'utente nello store locale Keycloak. Se l'utente non
+        risulta, solleva un errore diagnostico.
+        """
+        try:
+            users = await self.kc.a_get_users(
+                {"username": username, "exact": "true"}
+            )
+        except KeycloakError as exc:
+            raise KeycloakAdminError(
+                f"lookup user '{username}' fallito: {exc}"
+            ) from exc
+        for user in users or []:
+            if user.get("username", "").lower() == username.lower() and user.get("id"):
+                return user["id"]
+        raise KeycloakAdminError(
+            f"user '{username}' non materializzato dalla federation: "
+            f"verificare che esista in LDAP e che 'Import users' sia attivo "
+            f"sul provider"
+        )
+
     async def _require_group(self, group_path: str) -> dict[str, Any]:
         path = group_path if group_path.startswith("/") else f"/{group_path}"
         try:
